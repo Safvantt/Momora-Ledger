@@ -2403,7 +2403,7 @@ function handleStaffLogin(e){
     !deletedStaffIds.includes(s.username?.toLowerCase()) &&
     s.username && 
     s.username.trim().toLowerCase() === uLower && 
-    String(s.password).trim() === p
+    (String(s.password).trim() === p || String(s.password).trim().toLowerCase() === p.toLowerCase())
   );
 
   if(!staff){
@@ -3122,7 +3122,12 @@ function load(){
       if(Array.isArray(d)) deletedStaffIds = d;
     } catch(e){ deletedStaffIds = []; }
 
-    // 1. Load Staff Accounts (Start clean with 0 staff accounts - all previous IDs removed)
+    // Ensure authorized staff accounts (Rinsha and Nidha) are never blocked
+    deletedStaffIds = deletedStaffIds.filter(id => 
+      !['staff-rinsha', 'rinsha', 'staff-nidha', 'nidha'].includes(String(id).toLowerCase())
+    );
+
+    // 1. Load Staff Accounts
     const rawStaff = localStorage.getItem(STORAGE_KEYS.STAFF_ACCOUNTS);
     if(rawStaff !== null){
       try {
@@ -3140,12 +3145,52 @@ function load(){
       staffAccounts = [];
     }
 
-    // Purge default test staff accounts
-    staffAccounts = staffAccounts.filter(s => !['STAFF-1', 'STAFF-2'].includes(s.id) && !['reception', 'staff'].includes(s.username?.toLowerCase()));
+    // Purge obsolete test staff accounts
+    staffAccounts = staffAccounts.filter(s => 
+      !['STAFF-1', 'STAFF-2'].includes(s.id) && 
+      !['reception', 'staff'].includes(s.username?.toLowerCase())
+    );
 
     // Permanently record default test accounts as deleted so they never reappear
     ['STAFF-1', 'STAFF-2', 'reception', 'staff'].forEach(id => {
       if(!deletedStaffIds.includes(id)) deletedStaffIds.push(id);
+    });
+
+    // Seed official Staff Accounts: Rinsha & Nidha
+    const DEFAULT_STAFF_ACCOUNTS = [
+      {
+        id: 'STAFF-RINSHA',
+        name: 'Rinsha',
+        username: 'Rinsha',
+        password: 'Rinsha@981',
+        role: 'Receptionist',
+        phone: '',
+        monthlySalary: 20000,
+        createdAt: '2026-11-10'
+      },
+      {
+        id: 'STAFF-NIDHA',
+        name: 'Nidha',
+        username: 'Nidha',
+        password: 'Nidha@054',
+        role: 'Receptionist',
+        phone: '',
+        monthlySalary: 20000,
+        createdAt: '2026-11-10'
+      }
+    ];
+
+    DEFAULT_STAFF_ACCOUNTS.forEach(defStaff => {
+      const isDeleted = deletedStaffIds.includes(defStaff.id) || deletedStaffIds.includes(defStaff.username.toLowerCase());
+      const existing = staffAccounts.find(s => s.username.toLowerCase() === defStaff.username.toLowerCase());
+      if(!isDeleted){
+        if(!existing){
+          staffAccounts.push({...defStaff});
+        } else {
+          existing.password = defStaff.password;
+          existing.name = defStaff.name;
+        }
+      }
     });
 
     try {
