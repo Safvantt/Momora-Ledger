@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Momora Room Management & Integrated Accounts Suite</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23800020'/><text y='68' x='50' font-size='56' text-anchor='middle' fill='%23ffffff' font-family='system-ui,sans-serif' font-weight='bold'>m</text></svg>">
 <!-- External Libraries for PDF, Excel & Supabase Cloud Sync (Deferred for non-blocking offline performance) -->
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -277,10 +278,8 @@ tr:hover td{background:#fffafb}
 <!-- ========================================== -->
 <!-- 0. SECURE FULLSCREEN LOGIN OVERLAY         -->
 <!-- ========================================== -->
-<div class="login-overlay" id="loginOverlay" onclick="if(event.target === this) closeLoginOverlay()">
+<div class="login-overlay" id="loginOverlay">
   <div class="login-card" style="position:relative">
-    <!-- Close button (Always available to dismiss overlay) -->
-    <button type="button" id="loginOverlayCloseBtn" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:#7e706a;padding:4px 10px;line-height:1;display:inline-block" onclick="closeLoginOverlay()" title="Close / Enter Dashboard">✕</button>
 
     <div style="text-align:center;margin-bottom:18px">
       <div class="mark" style="margin:0 auto 10px;width:52px;height:52px;font-size:24px">m</div>
@@ -316,19 +315,23 @@ tr:hover td{background:#fffafb}
     <form id="staffLoginForm" onsubmit="handleStaffLogin(event); return false;" style="display:none">
       <div class="field" style="margin-bottom:12px">
         <label>Staff Username</label>
-        <input id="staffLoginUser" placeholder="Enter Staff Username" value="reception" oninput="if($('staffLoginError'))$('staffLoginError').textContent=''" onkeydown="if(event.key==='Enter'){ handleStaffLogin(event); return false; }">
+        <input id="staffLoginUser" placeholder="Enter Staff Username" value="" oninput="if($('staffLoginError'))$('staffLoginError').textContent=''" onkeydown="if(event.key==='Enter'){ handleStaffLogin(event); return false; }">
       </div>
       <div class="field" style="margin-bottom:14px">
         <label>Password</label>
-        <input id="staffLoginPass" type="password" placeholder="Enter Staff Password (123)" autocomplete="current-password" oninput="if($('staffLoginError'))$('staffLoginError').textContent=''" onkeydown="if(event.key==='Enter'){ handleStaffLogin(event); return false; }">
+        <input id="staffLoginPass" type="password" placeholder="Enter Staff Password" autocomplete="current-password" oninput="if($('staffLoginError'))$('staffLoginError').textContent=''" onkeydown="if(event.key==='Enter'){ handleStaffLogin(event); return false; }">
       </div>
       <div class="tiny" id="staffLoginError" style="color:#a33d52;font-weight:600;margin-bottom:10px"></div>
       <button type="button" id="staffLoginSubmitBtn" onclick="handleStaffLogin(event)" style="width:100%;padding:12px;background:#0b664a;color:#fff;font-weight:700;border:none;border-radius:10px;cursor:pointer;font-size:14px;box-shadow:0 4px 12px rgba(11,102,74,0.25)">👤 Sign In as Staff</button>
       <div class="tiny muted" style="margin-top:14px;text-align:center;line-height:1.4;background:#f4eee9;padding:10px;border-radius:8px;border:1px solid #e2d5cb">
-        👤 <strong>Duty Staff Credentials:</strong> Username: <b>reception</b> · Password: <b>123</b><br>
-        <span style="font-size:11px;color:#7e706a">New staff accounts can be created by Administrator in Staff Management.</span>
+        <span style="font-size:11.5px;color:#7e706a">Staff IDs are created and authorized by Administrator in the <strong>Staff Accounts</strong> tab.</span>
       </div>
     </form>
+
+    <!-- Return link (Visible only when an existing session is already active) -->
+    <div id="loginOverlayCancelRow" style="display:none;text-align:center;margin-top:14px">
+      <button type="button" onclick="closeLoginOverlay()" style="background:none;border:none;color:#7e706a;text-decoration:underline;cursor:pointer;font-size:12px">← Return to current session</button>
+    </div>
   </div>
 </div>
 
@@ -2336,11 +2339,12 @@ function switchLoginTab(tab){
       if(p) p.focus();
     }, 60);
   } else {
-    if(!$('staffLoginUser').value) $('staffLoginUser').value = 'reception';
     $('staffLoginPass').value = '';
     setTimeout(() => {
+      const u = $('staffLoginUser');
       const p = $('staffLoginPass');
-      if(p) p.focus();
+      if(u && !u.value) u.focus();
+      else if(p) p.focus();
     }, 60);
   }
 }
@@ -2351,8 +2355,9 @@ function openLoginPortal(tab = 'admin'){
     overlay.style.display = 'flex';
     overlay.style.visibility = 'visible';
   }
-  if($('loginOverlayCloseBtn')){
-    $('loginOverlayCloseBtn').style.display = 'inline-block';
+  const cancelRow = $('loginOverlayCancelRow');
+  if(cancelRow){
+    cancelRow.style.display = currentSession ? 'block' : 'none';
   }
   switchLoginTab(tab);
 }
@@ -2361,11 +2366,10 @@ function openAdminLoginModal(){ openLoginPortal('admin'); }
 function openStaffLoginModal(){ openLoginPortal('staff'); }
 
 function closeLoginOverlay(){
+  // Privacy & Security Protection:
+  // Login portal cannot be closed or bypassed if no authenticated session exists!
   if(!currentSession){
-    currentSession = { role: 'admin', username: 'Safvantt', name: 'Safvantt (Admin)' };
-    try { sessionStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(currentSession)); } catch(e){}
-    try { updateRoleUI(); } catch(e){}
-    try { render(); } catch(e){}
+    return false;
   }
   const overlay = $('loginOverlay') || document.querySelector('.login-overlay');
   if(overlay){
@@ -2386,15 +2390,25 @@ function handleStaffLogin(e){
   const u = ($('staffLoginUser')?.value || '').trim();
   const p = ($('staffLoginPass')?.value || '').trim();
 
-  const staffUser = u || 'reception';
-  const staffPass = p || '123';
+  if(!u || !p){
+    if($('staffLoginError')){
+      $('staffLoginError').textContent = '⚠️ Please enter both Staff Username and Password.';
+    }
+    return false;
+  }
 
-  const uLower = staffUser.toLowerCase();
-  const staff = staffAccounts.find(s => !deletedStaffIds.includes(s.id) && s.username && s.username.toLowerCase() === uLower && String(s.password) === staffPass);
+  const uLower = u.toLowerCase();
+  const staff = staffAccounts.find(s => 
+    !deletedStaffIds.includes(s.id) && 
+    !deletedStaffIds.includes(s.username?.toLowerCase()) &&
+    s.username && 
+    s.username.trim().toLowerCase() === uLower && 
+    String(s.password).trim() === p
+  );
 
   if(!staff){
     if($('staffLoginError')){
-      $('staffLoginError').textContent = '⚠️ Invalid staff username or password.';
+      $('staffLoginError').textContent = '⚠️ Invalid staff username or password. Account not found.';
     }
     const pInput = $('staffLoginPass');
     if(pInput){
@@ -2435,6 +2449,15 @@ function handleAdminLogin(e){
   const u = ($('adminLoginUser')?.value || '').trim();
   const p = ($('adminLoginPass')?.value || '').trim();
 
+  if(!p){
+    if($('adminLoginError')){
+      $('adminLoginError').textContent = '⚠️ Please enter Admin Password.';
+    }
+    const pInput = $('adminLoginPass');
+    if(pInput) pInput.focus();
+    return false;
+  }
+
   const validAdminUser = systemSettings.adminUser || 'Safvantt';
   const validAdminPass = systemSettings.adminPin || 'Sfz@78633';
 
@@ -2443,9 +2466,7 @@ function handleAdminLogin(e){
   const validPassClean = String(validAdminPass).replace(/[\s\u00a0]+/g, '').toLowerCase();
 
   // Master Admin authentication:
-  // Accepts exact or case-insensitive Sfz@78633, numeric part 78633, common typos, or empty click
   const isPassValid = (
-    !p ||
     p === validAdminPass ||
     p === 'Sfz@78633' ||
     pClean === 'sfz@78633' ||
@@ -2607,12 +2628,15 @@ function updateRoleUI(){
 
 function unlockAdminViaInput(inputId){
   const pin = ($(inputId)?.value || '').trim();
+  if(!pin){
+    alert('⚠️ Please enter Admin Password / PIN.');
+    return;
+  }
   const validAdminPass = systemSettings.adminPin || 'Sfz@78633';
   const pinClean = pin.replace(/[\s\u00a0]+/g, '').toLowerCase();
   const validPassClean = String(validAdminPass).replace(/[\s\u00a0]+/g, '').toLowerCase();
 
   if(
-    !pin ||
     pin === validAdminPass ||
     pin === 'Sfz@78633' ||
     pinClean === 'sfz@78633' ||
@@ -2795,8 +2819,12 @@ function handleCreateStaff(e){
     return;
   }
 
+  const newId = `STAFF-${Date.now()}`;
+  deletedStaffIds = deletedStaffIds.filter(id => id !== newId && id !== username);
+  try { localStorage.setItem(STORAGE_KEYS.DELETED_STAFF, JSON.stringify(deletedStaffIds)); } catch(_){}
+
   staffAccounts.push({
-    id: `STAFF-${Date.now()}`,
+    id: newId,
     name, username, password, role, phone,
     monthlySalary,
     createdAt: todayISO()
@@ -2872,6 +2900,9 @@ function deleteStaffAccount(id){
     if(!deletedStaffIds.includes(id)){
       deletedStaffIds.push(id);
     }
+    if(staff.username && !deletedStaffIds.includes(staff.username.toLowerCase())){
+      deletedStaffIds.push(staff.username.toLowerCase());
+    }
     try {
       localStorage.setItem(STORAGE_KEYS.DELETED_STAFF, JSON.stringify(deletedStaffIds));
     } catch(e){}
@@ -2880,6 +2911,7 @@ function deleteStaffAccount(id){
     if(currentSession && currentSession.role === 'staff' && (currentSession.username === staff.username || currentSession.id === id)){
       currentSession = null;
       sessionStorage.removeItem(STORAGE_KEYS.SESSION);
+      updateRoleUI();
     }
 
     // 5. Persist immediately to localStorage
@@ -3090,41 +3122,36 @@ function load(){
       if(Array.isArray(d)) deletedStaffIds = d;
     } catch(e){ deletedStaffIds = []; }
 
-    // 1. Load Staff Accounts
+    // 1. Load Staff Accounts (Start clean with 0 staff accounts - all previous IDs removed)
     const rawStaff = localStorage.getItem(STORAGE_KEYS.STAFF_ACCOUNTS);
     if(rawStaff !== null){
       try {
         const savedStaff = JSON.parse(rawStaff);
-        staffAccounts = Array.isArray(savedStaff) ? savedStaff.filter(s => !deletedStaffIds.includes(s.id)) : [];
+        staffAccounts = Array.isArray(savedStaff) ? savedStaff.filter(s => 
+          !['STAFF-1', 'STAFF-2'].includes(s.id) && 
+          !['reception', 'staff'].includes(s.username?.toLowerCase()) && 
+          !deletedStaffIds.includes(s.id) &&
+          !deletedStaffIds.includes(s.username?.toLowerCase())
+        ) : [];
       } catch(e){
         staffAccounts = [];
       }
     } else {
-      const initialStaff = [
-        {
-          id: 'STAFF-1',
-          name: 'Duty Staff / Reception',
-          username: 'reception',
-          password: '123',
-          role: 'Front Desk Receptionist',
-          phone: '9876543210',
-          monthlySalary: 20000,
-          createdAt: todayISO()
-        },
-        {
-          id: 'STAFF-2',
-          name: 'Staff Desk',
-          username: 'staff',
-          password: '123',
-          role: 'Desk Staff',
-          phone: '9876543211',
-          monthlySalary: 18000,
-          createdAt: todayISO()
-        }
-      ].filter(s => !deletedStaffIds.includes(s.id));
-      staffAccounts = initialStaff;
-      try { localStorage.setItem(STORAGE_KEYS.STAFF_ACCOUNTS, JSON.stringify(staffAccounts)); } catch(e){}
+      staffAccounts = [];
     }
+
+    // Purge default test staff accounts
+    staffAccounts = staffAccounts.filter(s => !['STAFF-1', 'STAFF-2'].includes(s.id) && !['reception', 'staff'].includes(s.username?.toLowerCase()));
+
+    // Permanently record default test accounts as deleted so they never reappear
+    ['STAFF-1', 'STAFF-2', 'reception', 'staff'].forEach(id => {
+      if(!deletedStaffIds.includes(id)) deletedStaffIds.push(id);
+    });
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.STAFF_ACCOUNTS, JSON.stringify(staffAccounts));
+      localStorage.setItem(STORAGE_KEYS.DELETED_STAFF, JSON.stringify(deletedStaffIds));
+    } catch(e){}
 
     // 2. Load Bookings (Clear current customer invoices and start fresh)
     bookings = [];
@@ -3168,7 +3195,11 @@ function load(){
     // 6. Load Staff Advances & Salary Ledger
     const savedAdv = JSON.parse(localStorage.getItem(STORAGE_KEYS.STAFF_ADVANCES) || '[]');
     if(Array.isArray(savedAdv)){
-      staffAdvances = savedAdv.filter(a => !deletedStaffIds.includes(a.staffId));
+      staffAdvances = savedAdv.filter(a => 
+        !['STAFF-1', 'STAFF-2'].includes(a.staffId) &&
+        !deletedStaffIds.includes(a.staffId) &&
+        !deletedStaffIds.includes(a.staffName?.toLowerCase())
+      );
     }
 
     // Ensure staff accounts have monthlySalary field
